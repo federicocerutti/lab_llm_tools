@@ -26,6 +26,7 @@ from rdflib import Graph
 
 from lab.example_3_wikidata import main as export_graph
 from lab.settings import Settings
+from lab.task_1_sparql import answer
 from lab.task_2_hybrid_retrieval import retrieve_embedding, retrieve_sparql, retrieve_text
 settings = Settings()
 if not settings.litellm_api_key:
@@ -39,9 +40,12 @@ GRAPH_PATH = Path("f1_drivers.ttl")
 SYSTEM_PROMPT = dedent(
     """
     You are a Formula 1 assistant with access to retrieval tools.
-    Use the tools to answer questions about drivers, nationalities, and teams.
-    Prefer grounded answers based on tool output.
-    If the tools do not return enough evidence, say so.
+    You must call at least one tool before answering.
+    Never answer from general knowledge or guess.
+    For direct fact questions about a driver's nationality, team, or where they drove, call sparql_retrieve first.
+    If the first tool result is incomplete, you may call text_retrieve or embedding_retrieve next.
+    Use only tool output as evidence for the final answer.
+    If the tools do not return enough evidence, say so briefly.
     """
 ).strip()
 
@@ -84,6 +88,13 @@ def _build_tool_functions(graph: Graph) -> dict[str, Callable[[str], str]]:
     }
 
 
+def _fallback_tool_name(question: str) -> str:
+    lowered = question.lower()
+    if any(keyword in lowered for keyword in ("nationality", "team", "drive")):
+        return "sparql_retrieve"
+    return "text_retrieve"
+
+
 def run_agent(question: str, graph: Graph) -> str:
     """Run a tool-using RAG agent over the local Formula 1 graph."""
 
@@ -93,13 +104,16 @@ def run_agent(question: str, graph: Graph) -> str:
             "type": "function",
             "function": {
                 "name": name,
-                "description": fn.__doc__ or "",
+                "description": (
+                    fn.__doc__
+                    or "Retrieve grounded Formula 1 evidence. Use this before answering."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "question": {
                             "type": "string",
-                            "description": "A Formula 1 question about drivers, nationalities, or teams.",
+                            "description": "A Formula 1 question about a driver, nationality, or team.",
                         }
                     },
                     "required": ["question"],
@@ -116,6 +130,7 @@ def run_agent(question: str, graph: Graph) -> str:
     ]
 
     used_tools = False
+    context_chunks: list[str] = []
     while True:
         response = litellm.completion(
             **_completion_kwargs(),
@@ -131,7 +146,20 @@ def run_agent(question: str, graph: Graph) -> str:
         tool_calls = response_message.tool_calls or []
         if not tool_calls:
             if not used_tools:
-                return (response_message.content or "").strip()
+                fallback_name = _fallback_tool_name(question)
+                function_response = str(functions[fallback_name](question))
+                print(f"{fallback_name}({{'question': {question!r}}}) -> {function_response}")
+                context_chunks.append(function_response)
+                messages.append(
+                    {
+                        "role": "tool",
+                        "name": fallback_name,
+                        "content": function_response,
+                        "tool_call_id": "fallback",
+                    }
+                )
+                used_tools = True
+                continue
             break
 
         used_tools = True
@@ -150,6 +178,7 @@ def run_agent(question: str, graph: Graph) -> str:
                 function_response = str(exc)
 
             print(f"{function_name}({function_args}) -> {function_response}")
+            context_chunks.append(function_response)
             messages.append(
                 {
                     "tool_call_id": tool_call.id,
@@ -159,22 +188,10 @@ def run_agent(question: str, graph: Graph) -> str:
                 }
             )
 
-    final_response = litellm.completion(
-        **_completion_kwargs(),
-        messages=messages,
-        stream=True,
-    )
-
-    if isinstance(final_response, litellm.ModelResponse):
-        return (final_response.choices[0].message.content or "").strip()
-
-    chunks: list[str] = []
-    for chunk in final_response:
-        token = chunk.choices[0].delta.content or ""
-        print(token, end="", flush=True)
-        chunks.append(token)
-
-    return "".join(chunks).strip()
+    combined_context = "\n".join(context_chunks).strip()
+    if not combined_context:
+        return ""
+    return answer(question, combined_context)
 
 
 def _load_graph() -> Graph:

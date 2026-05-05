@@ -1,0 +1,27 @@
+@prefix ns1: <http://lab.unibs.it/ontology/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://lab.unibs.it/entity/charles-leclerc> rdfs:label "Charles Leclerc" ;
+    ns1:nationality "Monegasque" ;
+    ns1:team "Scuderia Ferrari" .
+
+<http://lab.unibs.it/entity/fernando-alonso> rdfs:label "Fernando Alonso" ;
+    ns1:nationality "Spanish" ;
+    ns1:team "Aston Martin F1 Team" .
+
+<http://lab.unibs.it/entity/lando-norris> rdfs:label "Lando Norris" ;
+    ns1:nationality "British" ;
+    ns1:team "McLaren" .
+
+<http://lab.unibs.it/entity/lewis-hamilton> rdfs:label "Lewis Hamilton" ;
+    ns1:nationality "British" ;
+    ns1:team "Scuderia Ferrari" .
+
+<http://lab.unibs.it/entity/max-verstappen> rdfs:label "Max Verstappen" ;
+    ns1:nationality "Dutch" ;
+    ns1:team "Red Bull Racing" .
+
+<http://lab.unibs.it/entity/michael-schumacher> rdfs:label "Michael Schumacher" ;
+    ns1:nationality "German" ;
+    ns1:team "Mercedes F1 Team" .
+
