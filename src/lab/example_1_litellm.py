@@ -19,7 +19,7 @@ def main():
     ]
 
     response = litellm.completion(
-        model=settings.model,
+        model=settings.litellm_model,
         messages=messages,
         max_tokens=settings.max_tokens,
         temperature=settings.temperature,

@@ -5,11 +5,11 @@ class Settings(BaseSettings):
     """Application settings, loaded from environment variables or .env file in the project root."""
 
     # LiteLLM API settings. 
-    litellm_base_url: str = "http://10.20.25.121:4000/v1"
+    litellm_base_url: str = "https://gpustack.ing.unibs.it/v1"
     litellm_api_key: str | None = None # Remember to set this in your .env file or environment variables!
 
     # Model settings. These are mostly the defaults recommended here: https://huggingface.co/Qwen/Qwen3.5-9B#best-practices
-    model: str = "openai/qwen-3.5-instruct"
+    model: str = "qwen35-4b"
     max_tokens: int = 32768
     temperature: float = 0 # For a more deterministic output
     top_p: float = 0.8
@@ -20,3 +20,9 @@ class Settings(BaseSettings):
     # External endpoints
     wikidata_endpoint: str = "https://query.wikidata.org/sparql"
     wikidata_user_agent: str = "UniBS-Lab/1.0 (university lab; non-commercial)"
+
+    @property
+    def litellm_model(self) -> str:
+        """Return a LiteLLM-compatible model name."""
+
+        return self.model if "/" in self.model else f"openai/{self.model}"

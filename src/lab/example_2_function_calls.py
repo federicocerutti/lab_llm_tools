@@ -1,7 +1,6 @@
 import json
 
 import litellm
-from litellm.utils import function_to_dict
 
 from lab.settings import Settings
 
@@ -18,7 +17,7 @@ litellm.api_key = settings.litellm_api_key
 
 def _completion_kwargs():
     return {
-        "model": settings.model,
+        "model": settings.litellm_model,
         "max_tokens": settings.max_tokens,
         "temperature": settings.temperature,
         "top_p": settings.top_p,
@@ -65,8 +64,27 @@ def main():
         {"role": "user", "content": USER_PROMPT},
     ]
 
-    # Populate the TOOLS variable with the available functions using the docstrings as descriptions.
-    tools = [{"type": "function", "function": function_to_dict(f)} for f in functions.values()]
+    # Populate the TOOLS variable with the available functions using explicit JSON schemas.
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_championships",
+                "description": get_championships.__doc__ or "",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "driver_name": {
+                            "type": "string",
+                            "description": "The Formula 1 driver name.",
+                        }
+                    },
+                    "required": ["driver_name"],
+                    "additionalProperties": False,
+                },
+            },
+        }
+    ]
 
     response = litellm.completion(
         **_completion_kwargs(),
